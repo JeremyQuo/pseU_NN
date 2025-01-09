@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-from torch.nn import functional as F
+from model import GraphCNN
 import random
 
 
@@ -98,9 +98,6 @@ def read_file(directory_path, label):
     return data_list
 
 
-
-
-
 # Step 4: Train the model
 def train_model(model, data_loader, optimizer, criterion, device):
     model.train()
@@ -130,8 +127,8 @@ def evaluate_model(model, data_loader, device):
     return auc_roc
 
 
-positive_file = read_file('pseU_NN/data/mlf/bpseq', 1, )
-negative_file = read_file('pseU_NN/data/neg/bpseq', 0, )
+positive_file = read_file('data/mlf/bpseq', 1, )
+negative_file = read_file('data/neg/bpseq', 0, )
 
 device = torch.device(DEVICE_NUM)
 positive_file.extend(negative_file)

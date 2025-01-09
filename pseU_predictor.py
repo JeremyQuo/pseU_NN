@@ -4,32 +4,22 @@ import numpy as np
 import os
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-from torch.nn import functional as F
-import random
+from model import GraphCNN
 import torch
-import torch.nn as nn
-
-num_nodes = 41
-# 设置随机种子
-seed = 24
-torch.manual_seed(seed)  # 设置 PyTorch 随机种子
-np.random.seed(seed)  # 设置 NumPy 随机种子
-random.seed(seed)
-DEVICE_NUM = 'cuda:0'
 
 BASES = ['A', 'U', 'C', 'G']
 BASE_TO_INDEX = {base: idx for idx, base in enumerate(BASES)}
 SEQUENCE_LENGTH = 41
 
 
-def read_file(directory_path):
+def read_file(directory_path,file_number):
     file_names = os.listdir(directory_path)
     data_list = []
     num_file = 0
-
     for file_name in file_names:
-        if num_file >= 1000:
-            break
+        if file_number is not None:
+            if num_file >= file_number:
+                break
         # Read file
         file_path = os.path.join(directory_path, file_name)
         df = pd.read_csv(file_path, skiprows=1, header=None, sep='\t')
@@ -68,58 +58,36 @@ def read_file(directory_path):
         data = Data(x=x)
         data_list.append(data)
         num_file += 1
-    return data_list
+    return data_list,file_names[:num_file]
 
-
-class GraphCNN(nn.Module):
-    def __init__(self):
-        super(GraphCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1)  # 输入通道为1，输出通道为16
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 3), padding=1)  # 输出通道为32
-        self.fc1 = nn.Linear(8 * (num_nodes // 2) * (num_nodes // 2), 128)  # 全连接层
-        self.fc2 = nn.Linear(128, 4)
-        self.fc3 = nn.Linear(8, 1)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=4, nhead=4)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=4)
-        self.dropout = nn.Dropout(p=0.2)
-        self.Sigmoid = nn.Sigmoid()
-
-    def forward(self, x, batch):
-        adj_x = x[:, :, :num_nodes]
-        seq_x = x[:, :, num_nodes:]
-        adj_x = adj_x.reshape([batch, 1, num_nodes, num_nodes])
-        adj_x = self.pool(F.relu(self.conv1(adj_x)))
-        adj_x = self.pool(F.relu(self.conv2(adj_x)))
-        adj_x = adj_x.view(-1, 8 * (num_nodes // 2) * (num_nodes // 2))  # 展平
-        adj_x = F.relu(self.fc1(adj_x))
-        adj_x = self.dropout(adj_x)
-        adj_x = F.relu(self.fc2(adj_x))
-        seq_x = self.transformer(seq_x)  # [batch_size, seq_len, hidden_dim]
-        seq_x = seq_x.mean(dim=1)  # Pool over the sequence dimension
-        x = torch.cat((adj_x, seq_x), dim=1)
-        return self.Sigmoid(self.fc3(x))
-
-
-def main(input_file, model_file, output_dir):
-    input_file = read_file(input_file)
-    model = torch.load(model_file)
-    test_dataset = DataLoader(input_file, batch_size=len(input_file), shuffle=True)
+def main(input_file, model_file, output_file, batch_size, device,file_number):
+    input_file,file_names = read_file(input_file,file_number)
+    model = torch.load(model_file, map_location=torch.device(device))
+    test_dataset = DataLoader(input_file, batch_size=batch_size, shuffle=True)
     with torch.no_grad():
+        result = torch.tensor([])
         for batch in test_dataset:
-            batch = batch.to(DEVICE_NUM)
+            batch = batch.to(device)
             out = model(batch.x, batch.batch_size)
-            torch.save(out, os.path.join(output_dir, 'output.csv'))
-
+            result = torch.cat((result, out), dim=0)
+    df = pd.DataFrame(result.numpy(),columns=['predictions'])
+    df['seq_name'] = file_names
+    df = df[['seq_name','predictions']]
+    if output_file.split('.')[-1]!='csv':
+        output_file = output_file+'.csv'
+    df.to_csv(output_file,index=False)
+    print(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--input_file', type=str, help='Directory path to input files')
-    parser.add_argument('--model_file', type=str, help='Path to the model file')
-    parser.add_argument('--output_file', type=str, help='Output directory path')
-
+    parser.add_argument('-i','--input_folder', type=str, help='Directory path to input files')
+    parser.add_argument('--model', type=str, help='Path to the model file',default='model.pth')
+    parser.add_argument('-o','--output', type=str, help='Output directory path',default='output.csv')
+    parser.add_argument('--batch_size', type=int, help='batch_size of input feature', default=200)
+    parser.add_argument('--subsample_number', type=int, help='Subsample number if required', default=None)
+    parser.add_argument('--device', type=str, help='Device name', default='cpu')
     args = parser.parse_args()
-    main(args.input_file, args.model_file, args.output_dir)
+    main(args.input_folder, args.model, args.output, args.batch_size, args.device, args.subsample_number)
 
 
 

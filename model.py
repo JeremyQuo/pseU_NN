@@ -1,9 +1,9 @@
 from torch.nn import functional as F
 import torch
 import torch.nn as nn
-
+num_nodes=41
 class GraphCNN(nn.Module):
-    def __init__(self, conv1_layer, conv2_layer, hidden_layer,num_nodes):
+    def __init__(self, conv1_layer, conv2_layer, hidden_layer,num_nodes=41):
         super(GraphCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, conv1_layer, kernel_size=(3, 3), padding=1)  # 输入通道为1，输出通道为16
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -20,9 +20,9 @@ class GraphCNN(nn.Module):
         self.num_nodes=num_nodes
 
     def forward(self, x, batch):
-        adj_x = x[:, :, :self.num_nodes]
-        seq_x = x[:, :, self.num_nodes:]
-        adj_x = adj_x.reshape([batch, 1, self.num_nodes, self.num_nodes])
+        adj_x = x[:, :, :num_nodes]
+        seq_x = x[:, :, num_nodes:]
+        adj_x = adj_x.reshape([batch, 1,num_nodes, num_nodes])
         adj_x = self.pool(F.relu(self.conv1(adj_x)))
         adj_x = self.pool(F.relu(self.conv2(adj_x)))
         adj_x = adj_x.view(batch, -1)  # 展平
