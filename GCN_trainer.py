@@ -103,7 +103,7 @@ def evaluate_model(model, data_loader):
 
 # Initialize the model, optimizer, and loss function
 model = GCN(input_dim=4, hidden_dim=64, output_dim=2)  # 二分类任务
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 criterion = torch.nn.CrossEntropyLoss()
 
 # 训练流程

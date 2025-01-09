@@ -19,8 +19,9 @@ import plotnine as p9
 num_nodes = 41
 
 
+
 class GraphCNN(nn.Module):
-    def __init__(self, conv1_layer, conv2_layer, hidden_layer):
+    def __init__(self,conv1_layer,conv2_layer,hidden_layer):
         super(GraphCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, conv1_layer, kernel_size=(3, 3), padding=1)  # 输入通道为1，输出通道为16
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -33,15 +34,15 @@ class GraphCNN(nn.Module):
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=4)
         self.dropout1 = nn.Dropout(p=0.4)
         self.dropout2 = nn.Dropout(p=0.2)
-        self.Sigmoid = nn.Sigmoid()
+        self.Sigmoid=nn.Sigmoid()
 
     def forward(self, x, batch):
-        adj_x = x[:, :, :num_nodes]
-        seq_x = x[:, :, num_nodes:]
-        adj_x = adj_x.reshape([batch, 1, num_nodes, num_nodes])
+        adj_x = x[:,:, :num_nodes]
+        seq_x = x[:,:, num_nodes:]
+        adj_x = adj_x.reshape([batch,1,num_nodes,num_nodes])
         adj_x = self.pool(F.relu(self.conv1(adj_x)))
         adj_x = self.pool(F.relu(self.conv2(adj_x)))
-        adj_x = adj_x.view(batch, -1)  # 展平
+        adj_x = adj_x.view(batch,-1)  # 展平
         # adj_x = self.dropout(adj_x)
         adj_x = F.relu(self.fc1(adj_x))
         adj_x = self.dropout1(adj_x)

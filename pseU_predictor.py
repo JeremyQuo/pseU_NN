@@ -1,23 +1,26 @@
-import torch
+import argparse
 import pandas as pd
 import numpy as np
 import os
-
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch.nn import functional as F
 import random
+import torch
+import torch.nn as nn
 
+num_nodes = 41
 # 设置随机种子
 seed = 24
-torch.manual_seed(seed)          # 设置 PyTorch 随机种子
-np.random.seed(seed)             # 设置 NumPy 随机种子
+torch.manual_seed(seed)  # 设置 PyTorch 随机种子
+np.random.seed(seed)  # 设置 NumPy 随机种子
 random.seed(seed)
 DEVICE_NUM = 'cuda:0'
 
 BASES = ['A', 'U', 'C', 'G']
 BASE_TO_INDEX = {base: idx for idx, base in enumerate(BASES)}
 SEQUENCE_LENGTH = 41
+
 
 def read_file(directory_path):
     file_names = os.listdir(directory_path)
@@ -67,10 +70,7 @@ def read_file(directory_path):
         num_file += 1
     return data_list
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-num_nodes=41
+
 class GraphCNN(nn.Module):
     def __init__(self):
         super(GraphCNN, self).__init__()
@@ -83,12 +83,12 @@ class GraphCNN(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=4, nhead=4)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=4)
         self.dropout = nn.Dropout(p=0.2)
-        self.Sigmoid=nn.Sigmoid()
+        self.Sigmoid = nn.Sigmoid()
 
     def forward(self, x, batch):
-        adj_x = x[:,:, :num_nodes]
-        seq_x = x[:,:, num_nodes:]
-        adj_x = adj_x.reshape([batch,1,num_nodes,num_nodes])
+        adj_x = x[:, :, :num_nodes]
+        seq_x = x[:, :, num_nodes:]
+        adj_x = adj_x.reshape([batch, 1, num_nodes, num_nodes])
         adj_x = self.pool(F.relu(self.conv1(adj_x)))
         adj_x = self.pool(F.relu(self.conv2(adj_x)))
         adj_x = adj_x.view(-1, 8 * (num_nodes // 2) * (num_nodes // 2))  # 展平
@@ -97,15 +97,29 @@ class GraphCNN(nn.Module):
         adj_x = F.relu(self.fc2(adj_x))
         seq_x = self.transformer(seq_x)  # [batch_size, seq_len, hidden_dim]
         seq_x = seq_x.mean(dim=1)  # Pool over the sequence dimension
-        #seq_x = self.dropout(seq_x)
         x = torch.cat((adj_x, seq_x), dim=1)
         return self.Sigmoid(self.fc3(x))
 
-input_file = read_file('data/mlf/bpseq')
-model = torch.load('model.pth')
-test_dataset = DataLoader(input_file, batch_size=len(input_file), shuffle=True)
-with torch.no_grad():
-    for batch in test_dataset:
-        batch = batch.to(DEVICE_NUM)
-        out = model(batch.x, batch.batch_size)
-        print(1)
+
+def main(input_file, model_file, output_dir):
+    input_file = read_file(input_file)
+    model = torch.load(model_file)
+    test_dataset = DataLoader(input_file, batch_size=len(input_file), shuffle=True)
+    with torch.no_grad():
+        for batch in test_dataset:
+            batch = batch.to(DEVICE_NUM)
+            out = model(batch.x, batch.batch_size)
+            torch.save(out, os.path.join(output_dir, 'output.csv'))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--input_file', type=str, help='Directory path to input files')
+    parser.add_argument('--model_file', type=str, help='Path to the model file')
+    parser.add_argument('--output_file', type=str, help='Output directory path')
+
+    args = parser.parse_args()
+    main(args.input_file, args.model_file, args.output_dir)
+
+
+
