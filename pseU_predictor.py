@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-i','--input_folder', type=str, help='Directory path to input files')
     parser.add_argument('--model', type=str, help='Path to the model file',default='model.pth')
-    parser.add_argument('-o','--output', type=str, help='Output directory path',default='output.csv')
+    parser.add_argument('-o','--output', type=str, help='Output csv path',default='output.csv')
     parser.add_argument('--batch_size', type=int, help='batch_size of input feature', default=200)
     parser.add_argument('--subsample_number', type=int, help='Subsample number if required', default=None)
     parser.add_argument('--device', type=str, help='Device name', default='cpu')
